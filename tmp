@@ -1,0 +1,20 @@
+[SCHEMA: TÀI SẢN (ASSETS)]
+                       Kiểu dữ liệu  Số giá trị NULL
+asset_id                        str                0
+device_category                 str                0
+manufacturer                    str                0
+model_name                      str                0
+serial_number                   str                0
+purchase_date                   str                0
+warranty_end_date               str                0
+eol_date                        str                0
+eos_date                        str                0
+physical_location               str                0
+asset_status                    str                0
+purchase_price_usd          float64                0
+depreciation_rate           float64                0
+replacement_cost            float64                0
+maintenance_cost            float64                0
+operating_system                str                0
+Assigned_To_ID                  str            30024
+Campus                          str                0

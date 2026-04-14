@@ -1,0 +1,22 @@
+# Python environment
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database Session & Logs (Dọn dẹp file rác)
+*.session.sql
+*.log
+
+# Sensitive Data (Bảo mật thông tin Database)
+.env
+
+# Data files (Chỉ giữ cấu trúc, không upload data thật nếu quá nặng hoặc nhạy cảm)
+# Upload cả data sample để làm Portfolio
+data/raw/*.csv
+data/processed/*.csv
+
+# OS specific files
+.DS_Store
+Thumbs.db
+.vscode/
