@@ -1,0 +1,442 @@
+
+====================
+FILE: .\export_project.py
+====================
+
+import os
+
+# Cấu hình các loại file cần lấy nội dung và các thư mục cần bỏ qua
+INCLUDE_EXTENSIONS = ('.sql', '.py')
+EXCLUDE_DIRS = ('.git', 'venv', '__pycache__', '.pytest_cache')
+
+def export_project(output_file='PROJECT_EXPORT.txt'):
+    with open(output_file, 'w', encoding='utf-8') as outfile:
+        for root, dirs, files in os.walk('.'):
+            # Loại bỏ các thư mục không mong muốn
+            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+            
+            for file in files:
+                if file.endswith(INCLUDE_EXTENSIONS):
+                    file_path = os.path.join(root, file)
+                    
+                    # Ghi đường dẫn file
+                    outfile.write(f"\n{'='*20}\n")
+                    outfile.write(f"FILE: {file_path}\n")
+                    outfile.write(f"{'='*20}\n\n")
+                    
+                    # Ghi nội dung file
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as infile:
+                            outfile.write(infile.read())
+                        outfile.write("\n")
+                    except Exception as e:
+                        outfile.write(f"Could not read file: {e}\n")
+
+    print(f"Đã export toàn bộ code vào file: {output_file}")
+
+if __name__ == "__main__":
+    export_project()
+
+====================
+FILE: .\IT_Management_DB.session.sql
+====================
+
+
+
+====================
+FILE: .\main.py
+====================
+
+import subprocess
+import os
+import psycopg2
+from dotenv import load_dotenv
+
+# Tải cấu hình từ .env
+load_dotenv()
+
+def run_python_script(path):
+    print(f"\n[PYTHON] Đang chạy: {path}...")
+    result = subprocess.run(["python", path], capture_output=True, text=True)
+    if result.returncode == 0:
+        print(f"  --> Thành công!")
+    else:
+        print(f"  --> LỖI: {result.stderr}")
+        exit(1)
+
+def run_sql_file(file_path):
+    print(f"\n[SQL] Đang thực thi: {file_path}...")
+    try:
+        # Kết nối DB từ biến môi trường
+        conn = psycopg2.connect(
+            dbname=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASS"),
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT")
+        )
+        cur = conn.cursor()
+        
+        # Đọc nội dung file SQL
+        with open(file_path, 'r', encoding='utf-8') as f:
+            sql_query = f.read()
+        
+        # Thực thi SQL
+        cur.execute(sql_query)
+        conn.commit()
+        
+        print(f"  --> Thành công: Đã cập nhật View/Table từ {file_path}")
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"  --> LỖI SQL: {e}")
+        exit(1)
+
+def main():
+    print("="*50)
+    print("KHỞI CHẠY HỆ THỐNG DATA PIPELINE")
+    print("="*50)
+    
+    # BƯỚC 1: EXTRACT (Python)
+    # Tải dữ liệu từ Kaggle và tạo dữ liệu giả lập
+    run_python_script("scripts/extract_assets_to_csv.py")
+    run_python_script("scripts/extract_employees_to_csv.py")
+    run_python_script("scripts/extract_enroll_to_csv.py")
+    
+    # BƯỚC 2: LOAD (Python)
+    # Nạp dữ liệu thô từ CSV vào Postgres (Staging Layer)
+    run_python_script("scripts/load_csv_to_db.py")
+    
+    # BƯỚC 3: TRANSFORM & AUDIT (SQL)
+    # Chạy theo thứ tự: Làm sạch -> Tạo Fact Audit
+    # Lưu ý: Thứ tự này quan trọng vì fct_asset_audit dùng dữ liệu từ các view trf_
+    sql_files = [
+        "sql/trf_assets.sql",
+        "sql/trf_employees.sql",
+        "sql/fct_asset_audit.sql"
+    ]
+    for sql in sql_files:
+        run_sql_file(sql)
+        
+    # BƯỚC 4: REPORT (Python)
+    # Xuất báo cáo tóm tắt cuối cùng
+    run_python_script("scripts/db_data_summary.py")
+    
+    print("\n" + "="*50)
+    print("TOÀN BỘ QUY TRÌNH ĐÃ HOÀN TẤT THÀNH CÔNG!")
+    print("="*50)
+
+if __name__ == "__main__":
+    main()
+
+====================
+FILE: .\scripts\db_data_summary.py
+====================
+
+import psycopg2
+import os
+import pandas as pd
+from dotenv import load_dotenv
+
+# Thông tin kết nối
+load_dotenv()
+
+conn_params = {
+    "dbname": os.getenv("DB_NAME"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASS"),
+    "host": os.getenv("DB_HOST"),
+    "port": os.getenv("DB_PORT")
+}
+
+def get_inventory_report():
+    try:
+        conn = psycopg2.connect(**conn_params)
+        tables = ['trf_assets', 'stg_enrollment', 'trf_employees']
+        
+        print(f"{'='*25} DATABASE INVENTORY REPORT {'='*25}")
+
+        for table in tables:
+            print(f"\n[BẢNG: {table.upper()}]")
+            
+            # 1. LẤY SCHEMA (Tên cột và Kiểu dữ liệu)
+            schema_query = f"""
+            SELECT column_name, data_type, is_nullable
+            FROM information_schema.columns
+            WHERE table_name = '{table}' AND table_schema = 'public'
+            ORDER BY ordinal_position;
+            """
+            schema_df = pd.read_sql(schema_query, conn)
+            print("\n1. Schema (Cấu trúc):")
+            print(schema_df.to_string(index=False))
+            
+            # 2. LẤY SUMMARY (Số dòng và Check NULL)
+            print("\n2. Summary (Tóm tắt dữ liệu):")
+            # Tổng số dòng
+            total_rows = pd.read_sql(f"SELECT COUNT(*) FROM {table}", conn).iloc[0,0]
+            print(f"- Tổng số bản ghi: {total_rows}")
+            
+            # Kiểm tra NULL cho từng cột
+            null_data = []
+            for col in schema_df['column_name']:
+                # Dùng dấu ngoặc kép để tránh lỗi nếu tên cột có viết hoa
+                null_count = pd.read_sql(f'SELECT COUNT(*) FROM {table} WHERE "{col}" IS NULL', conn).iloc[0,0]
+                if null_count > 0:
+                    null_data.append({"Cột": col, "Số lượng NULL": null_count})
+            
+            if null_data:
+                print("- Các cột bị thiếu dữ liệu (NULL):")
+                print(pd.DataFrame(null_data).to_string(index=False))
+            else:
+                print("- Dữ liệu đầy đủ, không có NULL.")
+            
+            print("-" * 30)
+
+        # 3. KẾT QUẢ AUDIT (After created view audit)
+        print(f"\n{'='*25} AUDIT STATUS SUMMARY {'='*25}")
+        try:
+            audit_summary = pd.read_sql("SELECT audit_status, COUNT(*) as count FROM fct_assets_audit GROUP BY audit_status", conn)
+            print(audit_summary.to_string(index=False))
+        except:
+            print("Lưu ý: Chưa tìm thấy view fct_assets_audit")
+
+        conn.close()
+    except Exception as e:
+        print(f"Lỗi: {e}")
+
+if __name__ == "__main__":
+    get_inventory_report()
+
+====================
+FILE: .\scripts\extract_assets_to_csv.py
+====================
+
+import kagglehub
+import os
+import pandas as pd
+import glob
+import numpy as np
+from dotenv import load_dotenv
+
+# 1. Cấu hình Token
+load_dotenv() # Tải biến từ file .env
+os.environ["KAGGLE_API_TOKEN"] = os.getenv("KAGGLE_TOKEN")
+
+# 2. Tải dữ liệu từ Kaggle
+print("--- Đang tải dữ liệu từ Kaggle ---")
+path = kagglehub.dataset_download("isuranga/ai-based-technical-device-asset-profiling-dataset")
+
+# 3. Đọc dữ liệu
+csv_files = glob.glob(f"{path}/*.csv")
+if not csv_files:
+    print("Không tìm thấy file CSV!")
+    exit()
+
+df = pd.read_csv(csv_files[0])
+print(f"Đã tải thành công {len(df)} dòng dữ liệu.")
+
+# 4. "Làm giàu" dữ liệu (Data Enrichment)
+num_rows = len(df)
+
+# --- FIX LỖI Ở ĐÂY ---
+# Khởi tạo cột với kiểu chuỗi (None thay vì np.nan để ép kiểu sang Object ngay từ đầu)
+df['Assigned_To_ID'] = None 
+
+# Xác định mask (Phải đảm bảo 'asset_status' tồn tại trong file Kaggle)
+mask_active = df['asset_status'].isin(['In_Use', 'Under_Maintenance'])
+num_active = mask_active.sum()
+
+# Gán mã NV
+if num_active > 0:
+    # Sử dụng .astype(object) để đảm bảo Pandas chấp nhận gán chuỗi
+    df['Assigned_To_ID'] = df['Assigned_To_ID'].astype(object)
+    df.loc[mask_active, 'Assigned_To_ID'] = [f'NV-{np.random.randint(1, 201)}' for _ in range(num_active)]
+
+# Gán Campus
+df['Campus'] = np.random.choice(['District 7', 'Sala', 'Garden Hills'], num_rows)
+
+# 5. Lưu lại file master
+df.to_csv("master_assets.csv", index=False)
+print("--- Đã tạo file master_assets.csv thành công! ---")
+
+====================
+FILE: .\scripts\extract_employees_to_csv.py
+====================
+
+import pandas as pd
+import numpy as np
+
+# Tạo 200 nhân viên
+hr_data = {
+    'Employee_ID': [f'NV-{i}' for i in range(1, 201)],
+    'Full_Name': [f'Employee Name {i}' for i in range(1, 201)],
+    'Department': np.random.choice(['IT', 'HR', 'Finance', 'Sales', 'Academic', 'Operations'], 200),
+    'Position': np.random.choice(['Manager', 'Staff', 'Lead', 'Coordinator'], 200),
+    'Join_Date': pd.to_datetime(np.random.choice(pd.date_range('2020-01-01', '2025-01-01'), 200)),
+    # Giả lập 10% nhân viên đã nghỉ (Disabled)
+    'Status': np.random.choice(['Working', 'Disabled'], 200, p=[0.9, 0.1])
+}
+
+df_hr = pd.DataFrame(hr_data)
+df_hr.to_csv("master_employees.csv", index=False)
+print("--- Đã tạo Master_Employees với Status thành công! ---")
+
+====================
+FILE: .\scripts\extract_enroll_to_csv.py
+====================
+
+import pandas as pd
+import numpy as np
+
+# 1. Đọc file asset vừa tạo
+df_assets = pd.read_csv("master_assets.csv")
+
+# 2. Tạo pool "Hợp lệ" (Laptop/Desktop VÀ In_Use/Under_Maintenance)
+pool_hop_le = df_assets[
+    (df_assets['device_category'].isin(['Laptop', 'Desktop'])) & 
+    (df_assets['asset_status'].isin(['In_Use', 'Under_Maintenance']))
+].copy()
+
+# 3. Tạo 3% LỖI: Có trong Asset (In_Use) nhưng KHÔNG có trong Enrollment (IT quên nhập)
+# Chúng ta lấy 97% dữ liệu hợp lệ để đi tiếp
+df_enroll = pool_hop_le.sample(frac=0.97).copy()
+
+# 4. Tạo 5% LỖI: Máy không phải In_Use/Under_Maint nhưng VẪN có trong Enrollment
+pool_ngoai_le = df_assets[
+    (df_assets['device_category'].isin(['Laptop', 'Desktop'])) & 
+    (~df_assets['asset_status'].isin(['In_Use', 'Under_Maintenance']))
+].sample(frac=0.05).copy()
+
+df_enroll = pd.concat([df_enroll, pool_ngoai_le])
+
+# 5. Gán thông tin Enrollment & Tạo 10% LỖI: Sai mã NV (Primary_User != Assigned_To_ID)
+num_enroll = len(df_enroll)
+df_enroll['Primary_User'] = df_enroll['Assigned_To_ID']
+
+# Chọn 10% dòng để đổi mã NV khác
+mismatch_idx = df_enroll.sample(frac=0.1).index
+df_enroll.loc[mismatch_idx, 'Primary_User'] = [f'NV-{np.random.randint(1, 201)}' for _ in range(len(mismatch_idx))]
+
+# 6. Bổ sung các trường chuyên môn anh yêu cầu
+df_enroll['Entra_Join_Type'] = np.random.choice(['Hybrid Azure AD Join', 'Azure AD Join'], num_enroll)
+df_enroll['Windows_Device_Autopilot'] = True
+df_enroll['Windows_Autopilot_Profile'] = 'Assigned'
+df_enroll['ASM_State'] = 'Enrolled'
+df_enroll['OS'] = np.random.choice(['Windows 10', 'Windows 11'], num_enroll)
+
+# Lưu file
+df_enroll[['serial_number', 'Primary_User', 'Entra_Join_Type', 'Windows_Device_Autopilot', 'Windows_Autopilot_Profile', 'ASM_State', 'OS']].to_csv("master_enrollment.csv", index=False)
+
+print("--- Đã tạo Enrollment với đầy đủ các bẫy dữ liệu của anh! ---")
+
+====================
+FILE: .\scripts\load_csv_to_db.py
+====================
+
+import pandas as pd
+from sqlalchemy import create_engine
+
+# Kết nối tới database trong Docker
+engine = create_engine('postgresql://admin:mysecretpassword@localhost:5432/it_management')
+
+def load_data():
+    files = {
+        'master_assets.csv': 'stg_assets',
+        'master_employees.csv': 'dim_employees',
+        'master_enrollment.csv': 'stg_enrollment'
+    }
+    
+    for file, table in files.items():
+        print(f"--- Đang nạp {file} vào bảng {table}... ---")
+        try:
+            df = pd.read_csv(file)
+            df.to_sql(table, engine, if_exists='replace', index=False)
+            print(f"Thành công: Đã nạp {len(df)} dòng vào {table}.")
+        except Exception as e:
+            print(f"Lỗi khi nạp {file}: {e}")
+
+if __name__ == "__main__":
+    load_data()
+
+====================
+FILE: .\sql\fct_asset_audit.sql
+====================
+
+DROP VIEW IF EXISTS fct_assets_audit CASCADE;
+
+CREATE VIEW fct_assets_audit AS
+SELECT 
+    -- Ưu tiên lấy serial từ Asset, nếu không có thì lấy từ Enrollment
+    COALESCE(a.serial_number, e.serial_number) AS serial_number,
+    a.asset_status,
+    a."Assigned_To_ID" AS asset_owner,
+    e."Primary_User" AS enrolled_user,
+    CASE 
+        -- 1. TRƯỜNG HỢP CHỈ CÓ TRONG ENROLLMENT (Máy lạ/Máy ngoài danh mục tài sản)
+        WHEN a.serial_number IS NULL THEN 'Unknown Asset (Enrollment only)'
+
+        -- 2. TRƯỜNG HỢP CÓ TRONG ASSET NHƯNG KHÔNG CÓ TRONG ENROLLMENT
+        WHEN e.serial_number IS NULL THEN 
+            CASE 
+                WHEN a.asset_status IN ('In_Use', 'Under_Maintenance') THEN 'Missing Enrollment (Active Device)'
+                ELSE 'Healthy (Asset in Storage/Retired)' -- Máy kho không cần enroll là bình thường
+            END
+
+        -- 3. TRƯỜNG HỢP CÓ CẢ HAI NHƯNG SAI KHÁC THÔNG TIN
+        WHEN a."Assigned_To_ID" != e."Primary_User" THEN 'Mismatch User'
+
+        -- 4. TRƯỜNG HỢP GHOST DEVICE (Máy đã báo mất/hủy nhưng Enrollment vẫn active)
+        WHEN a.asset_status IN ('In_Storage', 'Retired', 'Lost') AND e.serial_number IS NOT NULL THEN 'Ghost Device'
+
+        -- 5. TRƯỜNG HỢP KHỚP HOÀN TOÀN
+        ELSE 'Healthy'
+    END AS audit_status
+FROM trf_assets a
+FULL OUTER JOIN stg_enrollment e ON a.serial_number = e.serial_number;
+
+====================
+FILE: .\sql\trf_assets.sql
+====================
+
+DROP VIEW IF EXISTS trf_assets CASCADE;
+
+CREATE VIEW trf_assets AS
+SELECT 
+    asset_id,
+    device_category,
+    manufacturer,
+    model_name,
+    serial_number,
+    -- Ép kiểu Date để Power BI nhận diện là định dạng thời gian
+    CAST(NULLIF(purchase_date, '') AS DATE) AS purchase_date,
+    CAST(NULLIF(warranty_end_date, '') AS DATE) AS warranty_end_date,
+    CAST(NULLIF(eol_date, '') AS DATE) AS eol_date,
+    CAST(NULLIF(eos_date, '') AS DATE) AS eos_date,
+    
+    physical_location,
+    asset_status,
+    purchase_price_usd,
+    depreciation_rate,
+    replacement_cost,
+    maintenance_cost,
+    operating_system,
+    "Assigned_To_ID",
+    "Campus"
+FROM stg_assets;
+
+====================
+FILE: .\sql\trf_employees.sql
+====================
+
+DROP VIEW IF EXISTS trf_employees CASCADE;
+
+CREATE VIEW trf_employees AS
+SELECT 
+    "Employee_ID",
+    TRIM("Full_Name") AS full_name,
+    TRIM("Department") AS department,
+    TRIM("Position") AS position,
+    -- Ép kiểu ngày Join_Date từ text sang date
+    CAST(NULLIF("Join_Date", '') AS DATE) AS join_date,
+    TRIM("Status") AS status
+FROM dim_employees;

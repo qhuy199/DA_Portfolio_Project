@@ -1,19 +1,23 @@
 import psycopg2
+import os
 import pandas as pd
+from dotenv import load_dotenv
 
 # Thông tin kết nối
+load_dotenv()
+
 conn_params = {
-    "dbname": "it_management",
-    "user": "admin",
-    "password": "mysecretpassword",
-    "host": "localhost",
-    "port": "5432"
+    "dbname": os.getenv("DB_NAME"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASS"),
+    "host": os.getenv("DB_HOST"),
+    "port": os.getenv("DB_PORT")
 }
 
 def get_inventory_report():
     try:
         conn = psycopg2.connect(**conn_params)
-        tables = ['vw_asset_clean', 'stg_enrollment', 'dim_employees']
+        tables = ['trf_assets', 'stg_enrollment', 'trf_employees']
         
         print(f"{'='*25} DATABASE INVENTORY REPORT {'='*25}")
 
@@ -56,10 +60,10 @@ def get_inventory_report():
         # 3. KẾT QUẢ AUDIT (After created view audit)
         print(f"\n{'='*25} AUDIT STATUS SUMMARY {'='*25}")
         try:
-            audit_summary = pd.read_sql("SELECT audit_status, COUNT(*) as count FROM vw_asset_audit GROUP BY audit_status", conn)
+            audit_summary = pd.read_sql("SELECT audit_status, COUNT(*) as count FROM fct_assets_audit GROUP BY audit_status", conn)
             print(audit_summary.to_string(index=False))
-        except:
-            print("Lưu ý: Chưa tìm thấy view vw_asset_audit.")
+        except Exception as e:
+            print("Lưu ý: Chưa tìm thấy view fct_assets_audit")
 
         conn.close()
     except Exception as e:

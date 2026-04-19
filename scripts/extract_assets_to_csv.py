@@ -3,9 +3,11 @@ import os
 import pandas as pd
 import glob
 import numpy as np
+from dotenv import load_dotenv
 
 # 1. Cấu hình Token
-os.environ["KAGGLE_API_TOKEN"] = "KGAT_5b90863fdbe42a5455acabc140634268"
+load_dotenv() # Tải biến từ file .env
+os.environ["KAGGLE_API_TOKEN"] = os.getenv("KAGGLE_TOKEN")
 
 # 2. Tải dữ liệu từ Kaggle
 print("--- Đang tải dữ liệu từ Kaggle ---")
@@ -41,5 +43,8 @@ if num_active > 0:
 df['Campus'] = np.random.choice(['District 7', 'Sala', 'Garden Hills'], num_rows)
 
 # 5. Lưu lại file master
-df.to_csv("master_assets.csv", index=False)
+output_dir = "data/raw"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+df.to_csv(os.path.join(output_dir, "master_assets.csv"), index=False)
 print("--- Đã tạo file master_assets.csv thành công! ---")

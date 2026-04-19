@@ -1,6 +1,6 @@
-DROP VIEW IF EXISTS vw_asset_clean CASCADE;
+DROP VIEW IF EXISTS trf_assets CASCADE;
 
-CREATE VIEW vw_asset_clean AS
+CREATE VIEW trf_assets AS
 SELECT 
     asset_id,
     device_category,

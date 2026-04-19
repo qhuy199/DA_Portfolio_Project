@@ -13,5 +13,10 @@ hr_data = {
 }
 
 df_hr = pd.DataFrame(hr_data)
-df_hr.to_csv("master_employees.csv", index=False)
+import os
+output_dir = "data/raw"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+df_hr.to_csv(os.path.join(output_dir, "master_employees.csv"), index=False)
 print("--- Đã tạo Master_Employees với Status thành công! ---")

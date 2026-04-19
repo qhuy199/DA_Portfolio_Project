@@ -1,6 +1,6 @@
-DROP VIEW IF EXISTS vw_employees_clean CASCADE;
+DROP VIEW IF EXISTS trf_employees CASCADE;
 
-CREATE VIEW vw_employees_clean AS
+CREATE VIEW trf_employees AS
 SELECT 
     "Employee_ID",
     TRIM("Full_Name") AS full_name,
