@@ -103,9 +103,13 @@ def main():
     # Nạp dữ liệu thô từ CSV vào Postgres (Staging Layer)
     run_python_script("scripts/load_csv_to_db.py")
     
-    # BƯỚC 3: TRANSFORM & AUDIT (SQL)
-    # Chạy theo thứ tự: Làm sạch -> Tạo Fact Audit
-    # Lưu ý: Thứ tự này quan trọng vì fct_asset_audit dùng dữ liệu từ các view trf_
+    # BƯỚC 3: SEED - Ghi đè các business rules vào dữ liệu thô
+    # Phải chạy TRƯỚC khi tạo View để View phản chiếu đúng giá trị
+    run_sql_file("sql/seed_depreciation.sql")
+
+    # BƯỚC 4: TRANSFORM & AUDIT (SQL)
+    # Chạy theo thứ tự: trf_ (làm sạch) -> fct_ (tổng hợp kiểm toán)
+    # Lưu ý: fct_asset_audit phụ thuộc vào trf_assets và trf_employees
     sql_files = [
         "sql/trf_assets.sql",
         "sql/trf_employees.sql",

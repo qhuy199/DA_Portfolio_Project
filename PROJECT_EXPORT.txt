@@ -47,17 +47,59 @@ FILE: .\IT_Management_DB.session.sql
 FILE: .\main.py
 ====================
 
+import sys
 import subprocess
 import os
+import time
 import psycopg2
+from psycopg2 import OperationalError
 from dotenv import load_dotenv
+
+# Thiết lập encoding utf-8 cho terminal để in tiếng Việt không bị lỗi
+sys.stdout.reconfigure(encoding='utf-8')
 
 # Tải cấu hình từ .env
 load_dotenv()
 
+def wait_for_db_ready():
+    print("\n[SYSTEM] Đang kích hoạt hạ tầng Docker và chờ Database...")
+    
+    # Kích hoạt docker-compose (tự động tải image nếu chưa có, bỏ qua nếu đã chạy)
+    subprocess.run(["docker-compose", "up", "-d"], check=True)
+    
+    max_retries = 10
+    print("           Bắt đầu gõ cửa thăm dò Database...")
+    for i in range(max_retries):
+        try:
+            conn = psycopg2.connect(
+                dbname=os.getenv("DB_NAME"),
+                user=os.getenv("DB_USER"),
+                password=os.getenv("DB_PASS"),
+                host=os.getenv("DB_HOST"),
+                port=os.getenv("DB_PORT")
+            )
+            conn.close()
+            print("  --> Gõ cửa thành công! Database ĐÃ SẴN SÀNG!")
+            return
+        except OperationalError:
+            print(f"  --> Chờ Database thức dậy (Lần thử {i+1}/{max_retries})...")
+            time.sleep(2)
+            
+    print("  --> LỖI MẠNG: Database từ chối kết nối. Vui lòng check lại Docker Desktop!")
+    sys.exit(1)
+
 def run_python_script(path):
     print(f"\n[PYTHON] Đang chạy: {path}...")
-    result = subprocess.run(["python", path], capture_output=True, text=True)
+    
+    # Sử dụng sys.executable để lấy đúng đường dẫn của venv hiện tại
+    python_executable = sys.executable 
+    
+    # Ép các tiến trình con dùng UTF-8 trên console Windows
+    run_env = os.environ.copy()
+    run_env["PYTHONUTF8"] = "1"
+    
+    result = subprocess.run([python_executable, path], capture_output=True, text=True, encoding='utf-8', env=run_env)
+    
     if result.returncode == 0:
         print(f"  --> Thành công!")
     else:
@@ -96,6 +138,9 @@ def main():
     print("="*50)
     print("KHỞI CHẠY HỆ THỐNG DATA PIPELINE")
     print("="*50)
+    
+    # BƯỚC 0: INFRASTRUCTURE SETUP
+    wait_for_db_ready()
     
     # BƯỚC 1: EXTRACT (Python)
     # Tải dữ liệu từ Kaggle và tạo dữ liệu giả lập
@@ -197,7 +242,7 @@ def get_inventory_report():
         try:
             audit_summary = pd.read_sql("SELECT audit_status, COUNT(*) as count FROM fct_assets_audit GROUP BY audit_status", conn)
             print(audit_summary.to_string(index=False))
-        except:
+        except Exception as e:
             print("Lưu ý: Chưa tìm thấy view fct_assets_audit")
 
         conn.close()
@@ -256,7 +301,10 @@ if num_active > 0:
 df['Campus'] = np.random.choice(['District 7', 'Sala', 'Garden Hills'], num_rows)
 
 # 5. Lưu lại file master
-df.to_csv("master_assets.csv", index=False)
+output_dir = "data/raw"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+df.to_csv(os.path.join(output_dir, "master_assets.csv"), index=False)
 print("--- Đã tạo file master_assets.csv thành công! ---")
 
 ====================
@@ -278,7 +326,12 @@ hr_data = {
 }
 
 df_hr = pd.DataFrame(hr_data)
-df_hr.to_csv("master_employees.csv", index=False)
+import os
+output_dir = "data/raw"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+df_hr.to_csv(os.path.join(output_dir, "master_employees.csv"), index=False)
 print("--- Đã tạo Master_Employees với Status thành công! ---")
 
 ====================
@@ -287,9 +340,20 @@ FILE: .\scripts\extract_enroll_to_csv.py
 
 import pandas as pd
 import numpy as np
+import os
+import sys
+import random
+
+# Thiết lập encoding utf-8 cho terminal để in tiếng Việt không bị lỗi
+sys.stdout.reconfigure(encoding='utf-8')
+
+# 1. Định nghĩa đường dẫn
+output_dir = "data/raw"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir) # Tạo thư mục nếu chưa có
 
 # 1. Đọc file asset vừa tạo
-df_assets = pd.read_csv("master_assets.csv")
+df_assets = pd.read_csv(os.path.join(output_dir, "master_assets.csv"))
 
 # 2. Tạo pool "Hợp lệ" (Laptop/Desktop VÀ In_Use/Under_Maintenance)
 pool_hop_le = df_assets[
@@ -297,11 +361,11 @@ pool_hop_le = df_assets[
     (df_assets['asset_status'].isin(['In_Use', 'Under_Maintenance']))
 ].copy()
 
-# 3. Tạo 3% LỖI: Có trong Asset (In_Use) nhưng KHÔNG có trong Enrollment (IT quên nhập)
+# 3. Tạo 3% LỖI: Có trong Asset (In_Use/Under_Maintenance) nhưng KHÔNG có trong Enrollment (máy đang dùng nhưng chưa enroll)
 # Chúng ta lấy 97% dữ liệu hợp lệ để đi tiếp
 df_enroll = pool_hop_le.sample(frac=0.97).copy()
 
-# 4. Tạo 5% LỖI: Máy không phải In_Use/Under_Maint nhưng VẪN có trong Enrollment
+# 4. Tạo 5% LỖI: Máy không phải In_Use/Under_Maint nhưng VẪN có trong Enrollment (IT nhập sai Asset State)
 pool_ngoai_le = df_assets[
     (df_assets['device_category'].isin(['Laptop', 'Desktop'])) & 
     (~df_assets['asset_status'].isin(['In_Use', 'Under_Maintenance']))
@@ -311,21 +375,76 @@ df_enroll = pd.concat([df_enroll, pool_ngoai_le])
 
 # 5. Gán thông tin Enrollment & Tạo 10% LỖI: Sai mã NV (Primary_User != Assigned_To_ID)
 num_enroll = len(df_enroll)
+
+# Giả sử danh sách NV tồn tại của anh là từ NV-1 đến NV-200 (không có padding 0 để đúng với các file khác)
+all_employee_ids = [f'NV-{i}' for i in range(1, 201)]
+
+# Đầu tiên, gán đúng hết 100%
 df_enroll['Primary_User'] = df_enroll['Assigned_To_ID']
 
-# Chọn 10% dòng để đổi mã NV khác
-mismatch_idx = df_enroll.sample(frac=0.1).index
-df_enroll.loc[mismatch_idx, 'Primary_User'] = [f'NV-{np.random.randint(1, 201)}' for _ in range(len(mismatch_idx))]
+# Tạo tập chứa 12% dữ liệu lỗi để đảm bảo không bị ghi đè (overlap)
+error_pool_idx = df_enroll.sample(frac=0.12).index
+split_point = int(len(error_pool_idx) * (10/12)) # 10% lỗi sai mã NV, 2% lỗi mã ảo
 
-# 6. Bổ sung các trường chuyên môn anh yêu cầu
-df_enroll['Entra_Join_Type'] = np.random.choice(['Hybrid Azure AD Join', 'Azure AD Join'], num_enroll)
-df_enroll['Windows_Device_Autopilot'] = True
-df_enroll['Windows_Autopilot_Profile'] = 'Assigned'
-df_enroll['ASM_State'] = 'Enrolled'
-df_enroll['OS'] = np.random.choice(['Windows 10', 'Windows 11'], num_enroll)
+# Tạo 10% LỖI: Chọn NV KHÁC (cùng trong danh sách)
+mismatch_idx = error_pool_idx[:split_point]
+# Sử dụng apply kết hợp list comprehension để CHẮC CHẮN ID được chọn phải khác ID hiện tại
+df_enroll.loc[mismatch_idx, 'Primary_User'] = df_enroll.loc[mismatch_idx, 'Primary_User'].apply(
+    lambda current_id: np.random.choice([eid for eid in all_employee_ids if eid != current_id])
+)
+
+# Đảm bảo 2% trường hợp cố tình tạo ra NV không tồn tại
+error_idx = error_pool_idx[split_point:]
+df_enroll.loc[error_idx, 'Primary_User'] = 'NV-999'
+
+# 6. Bổ sung các trường chuyên môn dựa trên bảng tỷ lệ thực tế
+data = [
+    (0.10, 'Azure AD Join', 'Windows 11', 'True', 'Assigned', 'Not Registered'),
+    (0.04, 'Azure AD Join', 'Windows 11', 'False', 'Assigned', 'Not Registered'),
+    (0.02, 'Azure AD Join', 'Windows 11', 'False', 'Not Assigned', 'Not Registered'),
+    (0.01, 'Azure AD Join', 'Windows 11', 'False', 'Not Registered', 'Not Registered'),
+    (0.05, 'Azure AD Join', 'Windows 10', 'True', 'Assigned', 'Not Registered'),
+    (0.03, 'Azure AD Join', 'Windows 10', 'False', 'Assigned', 'Not Registered'),
+    (0.02, 'Azure AD Join', 'Windows 10', 'False', 'Not Assigned', 'Not Registered'),
+    (0.01, 'Azure AD Join', 'Windows 10', 'False', 'Not Registered', 'Not Registered'),
+    (0.30, 'Azure AD Join', 'MacOS', 'False', 'Not Registered', 'Assigned'),
+    (0.005, 'Azure AD Join', 'MacOS', 'False', 'Not Registered', 'Not Registered'),
+    (0.10, 'Hybrid Azure AD Join', 'Windows 11', 'False', 'Assigned', 'Not Registered'),
+    (0.02, 'Hybrid Azure AD Join', 'Windows 11', 'False', 'Not Assigned', 'Not Registered'),
+    (0.01, 'Hybrid Azure AD Join', 'Windows 11', 'False', 'Not Registered', 'Not Registered'),
+    (0.15, 'Hybrid Azure AD Join', 'Windows 10', 'False', 'Assigned', 'Not Registered'),
+    (0.03, 'Hybrid Azure AD Join', 'Windows 10', 'False', 'Not Assigned', 'Not Registered'),
+    (0.01, 'Hybrid Azure AD Join', 'Windows 10', 'False', 'Not Registered', 'Not Registered'),
+    (0.01, 'Azure AD Register', 'Windows 11', 'False', 'Assigned', 'Not Registered'),
+    (0.01, 'Azure AD Register', 'Windows 11', 'False', 'Not Assigned', 'Not Registered'),
+    (0.01, 'Azure AD Register', 'Windows 11', 'False', 'Not Registered', 'Not Registered'),
+    (0.03, 'Azure AD Register', 'Windows 10', 'False', 'Assigned', 'Not Registered'),
+    (0.01, 'Azure AD Register', 'Windows 10', 'False', 'Not Assigned', 'Not Registered'),
+    (0.01, 'Azure AD Register', 'Windows 10', 'False', 'Not Registered', 'Not Registered'),
+    (0.01, 'Azure AD Register', 'MacOS', 'False', 'Not Registered', 'Assigned'),
+    (0.005, 'Azure AD Register', 'MacOS', 'False', 'Not Registered', 'Not Registered')
+]
+
+enrollment_features = []
+for ratio, join_type, os_val, autopilot, profile, asm in data:
+    count = int(num_enroll * ratio)
+    enrollment_features.extend([(join_type, autopilot, profile, asm, os_val)] * count)
+
+missing = num_enroll - len(enrollment_features)
+if missing > 0:
+    enrollment_features.extend(random.choices(enrollment_features, k=missing))
+elif missing < 0:
+    enrollment_features = enrollment_features[:num_enroll]
+
+random.shuffle(enrollment_features)
+features_df = pd.DataFrame(enrollment_features, columns=['Entra_Join_Type', 'Windows_Device_Autopilot', 'Windows_Autopilot_Profile', 'ASM_State', 'OS'])
+
+df_enroll = df_enroll.reset_index(drop=True)
+df_enroll[['Entra_Join_Type', 'Windows_Device_Autopilot', 'Windows_Autopilot_Profile', 'ASM_State', 'OS']] = features_df
 
 # Lưu file
-df_enroll[['serial_number', 'Primary_User', 'Entra_Join_Type', 'Windows_Device_Autopilot', 'Windows_Autopilot_Profile', 'ASM_State', 'OS']].to_csv("master_enrollment.csv", index=False)
+output_path = os.path.join(output_dir, "master_enrollment.csv")
+df_enroll[['serial_number', 'Primary_User', 'Entra_Join_Type', 'Windows_Device_Autopilot', 'Windows_Autopilot_Profile', 'ASM_State', 'OS']].to_csv(output_path, index=False)
 
 print("--- Đã tạo Enrollment với đầy đủ các bẫy dữ liệu của anh! ---")
 
@@ -335,9 +454,26 @@ FILE: .\scripts\load_csv_to_db.py
 
 import pandas as pd
 from sqlalchemy import create_engine
+import os
+import sys
+from dotenv import load_dotenv
 
-# Kết nối tới database trong Docker
-engine = create_engine('postgresql://admin:mysecretpassword@localhost:5432/it_management')
+# Tải biến môi trường
+load_dotenv()
+sys.stdout.reconfigure(encoding='utf-8')
+
+# Kết nối database bằng biến môi trường
+DB_USER = os.getenv("DB_USER")
+DB_PASS = os.getenv("DB_PASS")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
+engine = create_engine(f'postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}')
+
+import warnings
+from sqlalchemy import text
+# Bỏ qua warning không quan trọng
+warnings.filterwarnings('ignore')
 
 def load_data():
     files = {
@@ -346,14 +482,27 @@ def load_data():
         'master_enrollment.csv': 'stg_enrollment'
     }
     
+    data_dir = "data/raw"
+    
     for file, table in files.items():
-        print(f"--- Đang nạp {file} vào bảng {table}... ---")
+        file_path = os.path.join(data_dir, file)
+        print(f"--- Đang nạp {file_path} vào bảng {table}... ---")
         try:
-            df = pd.read_csv(file)
-            df.to_sql(table, engine, if_exists='replace', index=False)
+            df = pd.read_csv(file_path)
+            
+            # Xóa dữ liệu cũ thay vì báo DROP TABLE để tránh lỗi View Dependent
+            with engine.begin() as conn:
+                try:
+                    conn.execute(text(f'TRUNCATE TABLE {table} CASCADE;'))
+                except Exception:
+                    pass # Bỏ qua nếu bảng chưa tồn tại
+            
+            df.to_sql(table, engine, if_exists='append', index=False)
             print(f"Thành công: Đã nạp {len(df)} dòng vào {table}.")
         except Exception as e:
             print(f"Lỗi khi nạp {file}: {e}")
+            import sys
+            sys.exit(1) # Bắt buộc phải dừng Pipeline nếu có file bị lỗi
 
 if __name__ == "__main__":
     load_data()
