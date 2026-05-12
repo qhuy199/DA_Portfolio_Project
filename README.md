@@ -117,10 +117,37 @@ DA_PORTFOLIO_PROJECT/
 
 ---
 
-## 📊 Dashboard Reporting
+## 📊 Dashboard Preview
 
-After `main.py` reports `ENTIRE PIPELINE COMPLETED SUCCESSFULLY!`, the data is perfectly organized in the Database.
-You can directly plug **Power BI** into the data source `PostgreSQL (localhost:5432)`, and pull the `fct_assets_audit` view to build the Dashboard!
+The Power BI dashboard is designed following the **Pyramid Drill-down** architecture, moving from high-level executive summaries to granular technical details.
+
+### 1. Executive Overview (General Health)
+*High-level summary of the entire IT asset ecosystem.*
+![Executive Overview](reports/screenshots/01_executive_overview.png)
+
+---
+
+### 2. Asset Inventory & Lifecycle
+*Detailed breakdown of asset categories, brands, and age distribution.*
+![Asset Inventory](reports/screenshots/02_asset_inventory.png)
+
+---
+
+### 3. IT Audit & Compliance
+*Focusing on reconciliation between Asset Management and MDM Enrollment (Data Traps detection).*
+![IT Audit & Compliance](reports/screenshots/03_it_audit.png)
+
+---
+
+### 4. User & Assignment
+*Analysis of asset distribution across departments and user compliance.*
+![User & Assignment](reports/screenshots/04_user_assignment.png)
+
+---
+
+### 5. Technical Deep-dive
+*Granular data view for operational troubleshooting and direct action.*
+![Technical Deep-dive](reports/screenshots/05_technical_deepdive.png)
 
 ---
 
