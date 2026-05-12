@@ -153,6 +153,5 @@ The Power BI dashboard is designed following the **Pyramid Drill-down** architec
 
 ## 📝 Notes for Developers
 
-- See the [`AGENTS.md`](AGENTS.md) file to fully grasp coding conventions, pipeline flow, and business logic.
 - All credentials are managed via `.env` — **NEVER** hardcode them in the source code.
 - Data traps in `extract_enroll_to_csv.py` are created **intentionally** for analysis purposes — they are not bugs.
