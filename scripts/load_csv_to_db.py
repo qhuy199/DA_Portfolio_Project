@@ -4,11 +4,11 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Tải biến môi trường
+# Load environment variables
 load_dotenv()
 sys.stdout.reconfigure(encoding='utf-8')
 
-# Kết nối database bằng biến môi trường
+# Connect to database using env variables
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 DB_HOST = os.getenv("DB_HOST")
@@ -18,7 +18,7 @@ engine = create_engine(f'postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{D
 
 import warnings
 from sqlalchemy import text
-# Bỏ qua warning không quan trọng
+# Ignore unimportant warnings
 warnings.filterwarnings('ignore')
 
 def load_data():
@@ -32,23 +32,23 @@ def load_data():
     
     for file, table in files.items():
         file_path = os.path.join(data_dir, file)
-        print(f"--- Đang nạp {file_path} vào bảng {table}... ---")
+        print(f"--- Loading {file_path} into table {table}... ---")
         try:
             df = pd.read_csv(file_path)
             
-            # Xóa dữ liệu cũ thay vì báo DROP TABLE để tránh lỗi View Dependent
+            # Truncate old data instead of DROP TABLE to avoid View Dependent errors
             with engine.begin() as conn:
                 try:
                     conn.execute(text(f'TRUNCATE TABLE {table} CASCADE;'))
                 except Exception:
-                    pass # Bỏ qua nếu bảng chưa tồn tại
+                    pass # Skip if table does not exist
             
             df.to_sql(table, engine, if_exists='append', index=False)
-            print(f"Thành công: Đã nạp {len(df)} dòng vào {table}.")
+            print(f"Success: Loaded {len(df)} rows into {table}.")
         except Exception as e:
-            print(f"Lỗi khi nạp {file}: {e}")
+            print(f"Error loading {file}: {e}")
             import sys
-            sys.exit(1) # Bắt buộc phải dừng Pipeline nếu có file bị lỗi
+            sys.exit(1) # Force stop Pipeline if any file fails
 
 if __name__ == "__main__":
     load_data()

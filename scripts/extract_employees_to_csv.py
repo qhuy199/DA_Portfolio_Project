@@ -1,14 +1,14 @@
 import pandas as pd
 import numpy as np
 
-# Tạo 200 nhân viên
+# Create 200 employees
 hr_data = {
     'Employee_ID': [f'NV-{i}' for i in range(1, 201)],
     'Full_Name': [f'Employee Name {i}' for i in range(1, 201)],
     'Department': np.random.choice(['IT', 'HR', 'Finance', 'Sales', 'Academic', 'Operations'], 200),
     'Position': np.random.choice(['Manager', 'Staff', 'Lead', 'Coordinator'], 200),
     'Join_Date': pd.to_datetime(np.random.choice(pd.date_range('2020-01-01', '2025-01-01'), 200)),
-    # Giả lập 10% nhân viên đã nghỉ (Disabled)
+    # Simulate 10% disabled employees
     'Status': np.random.choice(['Working', 'Disabled'], 200, p=[0.9, 0.1])
 }
 
@@ -19,4 +19,4 @@ if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
 df_hr.to_csv(os.path.join(output_dir, "master_employees.csv"), index=False)
-print("--- Đã tạo Master_Employees với Status thành công! ---")
+print("--- Successfully created Master_Employees! ---")

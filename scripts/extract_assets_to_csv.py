@@ -5,46 +5,46 @@ import glob
 import numpy as np
 from dotenv import load_dotenv
 
-# 1. Cấu hình Token
-load_dotenv() # Tải biến từ file .env
+# 1. Token Configuration
+load_dotenv() # Load variables from .env file
 os.environ["KAGGLE_API_TOKEN"] = os.getenv("KAGGLE_TOKEN")
 
-# 2. Tải dữ liệu từ Kaggle
-print("--- Đang tải dữ liệu từ Kaggle ---")
+# 2. Download data from Kaggle
+print("--- Downloading data from Kaggle ---")
 path = kagglehub.dataset_download("isuranga/ai-based-technical-device-asset-profiling-dataset")
 
-# 3. Đọc dữ liệu
+# 3. Read data
 csv_files = glob.glob(f"{path}/*.csv")
 if not csv_files:
-    print("Không tìm thấy file CSV!")
+    print("CSV file not found!")
     exit()
 
 df = pd.read_csv(csv_files[0])
-print(f"Đã tải thành công {len(df)} dòng dữ liệu.")
+print(f"Successfully loaded {len(df)} rows of data.")
 
-# 4. "Làm giàu" dữ liệu (Data Enrichment)
+# 4. Data Enrichment
 num_rows = len(df)
 
-# --- FIX LỖI Ở ĐÂY ---
-# Khởi tạo cột với kiểu chuỗi (None thay vì np.nan để ép kiểu sang Object ngay từ đầu)
+# --- FIX ERROR HERE ---
+# Initialize column with string type (None instead of np.nan to cast to Object from the start)
 df['Assigned_To_ID'] = None 
 
-# Xác định mask (Phải đảm bảo 'asset_status' tồn tại trong file Kaggle)
+# Define mask (Ensure 'asset_status' exists in Kaggle file)
 mask_active = df['asset_status'].isin(['In_Use', 'Under_Maintenance'])
 num_active = mask_active.sum()
 
-# Gán mã NV
+# Assign Employee ID
 if num_active > 0:
-    # Sử dụng .astype(object) để đảm bảo Pandas chấp nhận gán chuỗi
+    # Use .astype(object) to ensure Pandas accepts string assignment
     df['Assigned_To_ID'] = df['Assigned_To_ID'].astype(object)
     df.loc[mask_active, 'Assigned_To_ID'] = [f'NV-{np.random.randint(1, 201)}' for _ in range(num_active)]
 
-# Gán Campus
+# Assign Campus
 df['Campus'] = np.random.choice(['District 7', 'Sala', 'Garden Hills'], num_rows)
 
-# 5. Lưu lại file master
+# 5. Save master file
 output_dir = "data/raw"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 df.to_csv(os.path.join(output_dir, "master_assets.csv"), index=False)
-print("--- Đã tạo file master_assets.csv thành công! ---")
+print("--- Successfully created master_assets.csv! ---")

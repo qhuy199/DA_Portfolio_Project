@@ -1,0 +1,33 @@
+# Virtual Environment
+venv/
+
+# Git
+.git/
+
+# IDE & Editor
+.vscode/
+*.code-workspace
+
+# Compiled Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment & Secrets
+.env
+
+# Data files (quá lớn, không cần quét)
+data/raw/*.csv
+data/processed/*.csv
+
+# Reports (binary, không parse được)
+reports/*.pbix
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Misc
+PROJECT_EXPORT.txt
+t.ipynb
+export_project.py

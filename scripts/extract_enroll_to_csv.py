@@ -4,28 +4,28 @@ import os
 import sys
 import random
 
-# Thiết lập encoding utf-8 cho terminal để in tiếng Việt không bị lỗi
+# Set utf-8 encoding for terminal
 sys.stdout.reconfigure(encoding='utf-8')
 
-# 1. Định nghĩa đường dẫn
+# 1. Define paths
 output_dir = "data/raw"
 if not os.path.exists(output_dir):
-    os.makedirs(output_dir) # Tạo thư mục nếu chưa có
+    os.makedirs(output_dir) # Create directory if not exists
 
-# 1. Đọc file asset vừa tạo
+# 1. Read newly created asset file
 df_assets = pd.read_csv(os.path.join(output_dir, "master_assets.csv"))
 
-# 2. Tạo pool "Hợp lệ" (Laptop/Desktop VÀ In_Use/Under_Maintenance)
+# 2. Create "Valid" pool (Laptop/Desktop AND In_Use/Under_Maintenance)
 pool_hop_le = df_assets[
     (df_assets['device_category'].isin(['Laptop', 'Desktop'])) & 
     (df_assets['asset_status'].isin(['In_Use', 'Under_Maintenance']))
 ].copy()
 
-# 3. Tạo 3% LỖI: Có trong Asset (In_Use/Under_Maintenance) nhưng KHÔNG có trong Enrollment (máy đang dùng nhưng chưa enroll)
-# Chúng ta lấy 97% dữ liệu hợp lệ để đi tiếp
+# 3. Create 3% ERROR: In Asset (In_Use/Under_Maintenance) but NOT in Enrollment
+# Take 97% of valid data to proceed
 df_enroll = pool_hop_le.sample(frac=0.97).copy()
 
-# 4. Tạo 5% LỖI: Máy không phải In_Use/Under_Maint nhưng VẪN có trong Enrollment (IT nhập sai Asset State)
+# 4. Create 5% ERROR: Device is not In_Use/Under_Maint but STILL in Enrollment
 pool_ngoai_le = df_assets[
     (df_assets['device_category'].isin(['Laptop', 'Desktop'])) & 
     (~df_assets['asset_status'].isin(['In_Use', 'Under_Maintenance']))
@@ -33,31 +33,31 @@ pool_ngoai_le = df_assets[
 
 df_enroll = pd.concat([df_enroll, pool_ngoai_le])
 
-# 5. Gán thông tin Enrollment & Tạo 10% LỖI: Sai mã NV (Primary_User != Assigned_To_ID)
+# 5. Assign Enrollment info & Create 10% ERROR: Wrong Employee ID (Primary_User != Assigned_To_ID)
 num_enroll = len(df_enroll)
 
-# Giả sử danh sách NV tồn tại của anh là từ NV-1 đến NV-200 (không có padding 0 để đúng với các file khác)
+# Assume employee list exists from NV-1 to NV-200
 all_employee_ids = [f'NV-{i}' for i in range(1, 201)]
 
-# Đầu tiên, gán đúng hết 100%
+# First, assign 100% correctly
 df_enroll['Primary_User'] = df_enroll['Assigned_To_ID']
 
-# Tạo tập chứa 12% dữ liệu lỗi để đảm bảo không bị ghi đè (overlap)
+# Create pool of 12% error data to ensure no overlap
 error_pool_idx = df_enroll.sample(frac=0.12).index
-split_point = int(len(error_pool_idx) * (10/12)) # 10% lỗi sai mã NV, 2% lỗi mã ảo
+split_point = int(len(error_pool_idx) * (10/12)) # 10% wrong ID, 2% fake ID
 
-# Tạo 10% LỖI: Chọn NV KHÁC (cùng trong danh sách)
+# Create 10% ERROR: Select DIFFERENT employee
 mismatch_idx = error_pool_idx[:split_point]
-# Sử dụng apply kết hợp list comprehension để CHẮC CHẮN ID được chọn phải khác ID hiện tại
+# Ensure selected ID is different from current ID
 df_enroll.loc[mismatch_idx, 'Primary_User'] = df_enroll.loc[mismatch_idx, 'Primary_User'].apply(
     lambda current_id: np.random.choice([eid for eid in all_employee_ids if eid != current_id])
 )
 
-# Đảm bảo 2% trường hợp cố tình tạo ra NV không tồn tại
+# Ensure 2% cases intentionally create non-existent employee
 error_idx = error_pool_idx[split_point:]
 df_enroll.loc[error_idx, 'Primary_User'] = 'NV-999'
 
-# 6. Bổ sung các trường chuyên môn dựa trên bảng tỷ lệ thực tế
+# 6. Add technical fields based on actual ratio
 data = [
     (0.10, 'Azure AD Join', 'Windows 11', 'True', 'Assigned', 'Not Registered'),
     (0.04, 'Azure AD Join', 'Windows 11', 'False', 'Assigned', 'Not Registered'),
@@ -102,8 +102,8 @@ features_df = pd.DataFrame(enrollment_features, columns=['Entra_Join_Type', 'Win
 df_enroll = df_enroll.reset_index(drop=True)
 df_enroll[['Entra_Join_Type', 'Windows_Device_Autopilot', 'Windows_Autopilot_Profile', 'ASM_State', 'OS']] = features_df
 
-# Lưu file
+# Save file
 output_path = os.path.join(output_dir, "master_enrollment.csv")
 df_enroll[['serial_number', 'Primary_User', 'Entra_Join_Type', 'Windows_Device_Autopilot', 'Windows_Autopilot_Profile', 'ASM_State', 'OS']].to_csv(output_path, index=False)
 
-print("--- Đã tạo Enrollment với đầy đủ các bẫy dữ liệu của anh! ---")
+print("--- Successfully created Enrollment with all data traps! ---")

@@ -1,79 +1,131 @@
 # 🏢 Modern Workspace Deployment Management - Data Pipeline
 
-Dự án này là một **Data Engineering Pipeline (Kiến trúc ELT)** hoàn chỉnh, tập trung vào việc mô phỏng quá trình quản lý và đối soát cấu hình thiết bị CNTT (IT Assets) cho nhân sự trong doanh nghiệp. Hệ thống hoàn toàn tự động hóa từ bước kéo dữ liệu chuẩn Kaggle, tạo kịch bản bẫy dữ liệu (Data Traps), nạp vào CSDL PostgreSQL và xử lý nghiệp vụ thông qua Data Warehouse (Mô hình Kimball).
+This project is a complete **Data Engineering Pipeline (ELT Architecture)** focused on simulating the management and reconciliation process of IT equipment (IT Assets) for corporate personnel. The system is fully automated, from fetching standard Kaggle data, generating intentional Data Traps, loading it into a PostgreSQL database, and applying business logic through a Data Warehouse (Kimball Model).
 
 ---
 
-## 🏗️ Kiến trúc & Công nghệ (Tech Stack)
+## 🏗️ Architecture & Tech Stack
 
-- **Ngôn ngữ:** Python (Pandas, SQLAlchemy, Psycopg2)
-- **Database:** PostgreSQL (Triển khai trên Docker)
-- **Kiến trúc luồng dữ liệu:** ELT (Extract - Load - Transform)
-- **Môi trường:** Docker, Virtual Environment
+- **Language:** Python (Pandas, SQLAlchemy, Psycopg2)
+- **Database:** PostgreSQL 15 (Deployed on Docker)
+- **Data Flow Architecture:** ELT (Extract - Load - Transform)
+- **Visualization:** Power BI
+- **Environment:** Docker, Virtual Environment
+
+### 📊 Data Pipeline Architecture
+
+```mermaid
+graph TD
+    A[Kaggle Dataset] -->|Python pandas| B(Extract: scripts/extract_*.py)
+    B -->|Generate Mock Data & Traps| C[Raw CSV Data: data/raw/*.csv]
+    C -->|Python SQLAlchemy| D(Load: scripts/load_csv_to_db.py)
+    D -->|Truncate & Insert| E[(PostgreSQL: Staging Tables)]
+    
+    E -->|SQL| F(Seed: sql/seed_depreciation.sql)
+    F -->|SQL Views| G(Transform: sql/trf_*.sql)
+    G -->|SQL Fact| H(Audit: sql/fct_asset_audit.sql)
+    
+    H -->|Python psycopg2| I(Report: scripts/db_data_summary.py)
+    H -->|Direct Query| J[Power BI Dashboard]
+```
 
 ---
 
-## 🚀 Hướng dấn Cài đặt & Chạy dự án (Quick Start)
+## 🚀 Quick Start (Installation & Execution)
 
-Pipeline được thiết kế để chỉ cần bấm **1 nút duy nhất** là toàn bộ hệ thống (kể cả Docker Database) sẽ tự động kích hoạt. Xin làm theo đúng 3 bước sau:
+The pipeline is designed so that you only need to run **a single command** to activate the entire system (including the Docker Database). Please follow these 3 steps exactly:
 
-### Bước 1: Yêu cầu hệ thống (Prerequisites)
-- Đảm bảo máy tính đã cài đặt sẵn **Python 3.9+**
-- Đảm bảo máy tính đã cài và đang mở ứng dụng **Docker Desktop**
+### Step 1: Prerequisites
+- Ensure **Python 3.9+** is installed on your machine.
+- Ensure **Docker Desktop** is installed and running.
 
-### Bước 2: Chuẩn bị biến môi trường (Environment Setup)
-Hệ thống sử dụng file `.env` để bảo mật thông tin.
-1. Tại thư mục gốc, tìm file có tên `.env.example`.
-2. Đổi tên (hoặc copy) file này thành **`.env`** (chỗ này rất quan trọng).
-3. (Tùy chọn) Để kéo dữ liệu thực từ Kaggle, bạn cần điền `KAGGLE_TOKEN` của riêng bạn vào file `.env`. 
-*(Cách lấy: Truy cập Kaggle.com -> Settings -> Account -> Create New API Token -> Dán chuỗi bí mật vào mục KAGGLE_TOKEN).*
+### Step 2: Environment Setup
+The system uses a `.env` file to secure configuration information.
+1. In the root directory, find the file named `.env.example`.
+2. Rename (or copy) this file to **`.env`** (this is very important).
+3. (Optional) To fetch real data from Kaggle, you need to provide your own `KAGGLE_TOKEN` in the `.env` file. 
+*(How to get it: Go to Kaggle.com -> Settings -> Account -> Create New API Token -> Paste the secret string into KAGGLE_TOKEN).*
 
-### Bước 3: Khởi chạy Data Pipeline
-Mở Terminal (Powershell/CMD) tại thư mục dự án và chạy các lệnh sau:
+### Step 3: Run the Data Pipeline
+Open your Terminal (Powershell/CMD) in the project directory and run the following commands:
 
 ```bash
-# 1. Tạo và kích hoạt môi trường bộ nhớ ảo (nếu bạn chưa có)
+# 1. Create and activate a virtual environment (if you haven't already)
 python -m venv venv
-.\venv\Scripts\activate      # Dành cho Windows
-# source venv/bin/activate   # Dành cho Mac/Linux
+.\venv\Scripts\activate      # For Windows
+# source venv/bin/activate   # For Mac/Linux
 
-# 2. Cài đặt các thư viện cần thiết
+# 2. Install required libraries
 pip install -r requirement.txt
 
-# 3. KÍCH HOẠT HỆ THỐNG (Chỉ cần 1 lệnh duy nhất này)
+# 3. ACTIVATE THE SYSTEM (Only this single command is needed)
 python main.py
 ```
 
-🎉 **XONG!** Script `main.py` sẽ thực thi các tác vụ:
-1. Tự động đánh thức Docker và thiết lập CSDL Postgres (`it_management`).
-2. Gõ cửa kiểm tra liên tục đến khi DB sẵn sàng (Health Check).
-3. `EXTRACT`: Sinh ngẫu nhiên và kéo Data về lưu thành định dạng `.csv` tại folder `data/raw/`
-4. `LOAD`: Quét dọn DB và bơm các data này thẳng vào staging tables.
-5. `TRANSFORM`: Thực thi SQL dọn rác và nhào nặn thành các Views hoàn chỉnh (`fct_asset_audit`, `trf_assets`).
+🎉 **DONE!** The `main.py` script will execute the tasks sequentially:
+1. **Infrastructure:** Automatically wake up Docker and set up the Postgres DB (`it_management`), pinging continuously until the DB is ready (Health Check).
+2. **EXTRACT:** Randomly generate mock data (with intentional data traps) and save as `.csv` in `data/raw/`.
+3. **LOAD:** Clean the DB and pump raw data into Staging Tables (`stg_*`).
+4. **SEED:** Overwrite business rules (depreciation tables) onto raw data.
+5. **TRANSFORM:** Execute SQL statements to clean data into Views (`trf_assets`, `trf_employees`) and aggregate the audit table (`fct_assets_audit`).
+6. **REPORT:** Export a data summary report to the console.
 
 ---
 
-## 📂 Cấu trúc thư mục (Directory Structure)
+## 🧩 Business Logic & Data Traps
+
+To showcase real-world Data Engineering skills, intentional "Data Traps" (data quality issues) are injected during the extraction phase. These traps simulate common issues in corporate IT management:
+
+| Trap Type | Ratio | Description |
+|---|---|---|
+| **Missing Enrollment** | ~3% | Device is In_Use/Under_Maintenance but has no MDM enrollment record. |
+| **Ghost Device** | ~5% | Device is Retired/In_Storage/Lost but still appears active in MDM. |
+| **Mismatch User** | ~10% | `Primary_User` != `Assigned_To_ID` (Unauthorized device swap). |
+| **Virtual Employee** | ~2% | `Primary_User` belongs to an employee ID that does not exist in HR records. |
+
+The SQL views (`fct_asset_audit.sql`) use priority `CASE WHEN` statements to successfully identify and flag these issues.
+
+---
+
+## 📂 Directory Structure
 
 ```plaintext
 DA_PORTFOLIO_PROJECT/
-├── data/raw/             # Nơi hệ thống tự động đổ file thô (CSV) sau quá trình Extract
-├── scripts/              # Chứa kịch bản xử lý Python
-│   ├── extract_*         # Các file bốc/sinh dữ liệu (Tạo kịch bản lỗi Mismatch ID...)
-│   ├── load_csv_to_db.py # Xe tải: Nạp file vào Staging Table
-│   └── db_data_summary.py# Xuất báo cáo sơ bộ ra console
-├── sql/                  # Chứa logic biến đổi dữ liệu (Chạy bên trong CSDL)
-│   ├── trf_*.sql         # Lớp làm sạch dữ liệu (Transformation Layer)
-│   └── fct_*.sql         # Bảng Fact lưu trữ kết quả kiểm toán (Audit Layer)
-├── reports/              # [Tương lai] Trữ file Dashboard (.pbix)
-├── .env.example          # Khung xương thiết lập cấu hình môi trường bảo mật
-├── docker-compose.yaml   # Cấu hình kiến trúc Hạ tầng Database
-├── requirement.txt       # Các công cụ thư viện Python phụ trợ
-└── main.py               # 🏆 BỘ ĐIỀU KHIỂN TRUNG TÂM (Orchestrator)
+├── data/
+│   ├── raw/                  # Auto-generated CSVs after Extract
+│   └── processed/            # [Reserved] Processed data
+├── scripts/                  # Python processing scripts
+│   ├── extract_assets_to_csv.py      # Generate IT assets data
+│   ├── extract_employees_to_csv.py   # Generate HR data
+│   ├── extract_enroll_to_csv.py      # Generate enrollment data (with data traps)
+│   ├── load_csv_to_db.py             # Load CSV to Staging Tables
+│   └── eda_data_quality.py           # EDA script to explore data traps
+│   └── db_data_summary.py            # Console summary report
+├── sql/                      # Data transformation logic (runs in DB)
+│   ├── seed_depreciation.sql         # Seed: Device depreciation table
+│   ├── trf_assets.sql                # Transform: Clean assets data
+│   ├── trf_employees.sql             # Transform: Clean HR data
+│   ├── trf_asset_cleaning.sql        # Transform: Additional cleaning rules
+│   └── fct_asset_audit.sql           # Fact: Device reconciliation audit table
+├── reports/                  # Power BI Dashboards (.pbix)
+├── .env.example              # Environment configuration template
+├── docker-compose.yaml       # Database Infrastructure (PostgreSQL 15)
+├── requirement.txt           # Python Dependencies
+├── main.py                   # 🏆 CENTRAL CONTROLLER (Orchestrator)
+└── AGENTS.md                 # Rules & conventions for AI coding tools (Single Source of Truth)
 ```
 
 ---
 
-## 📊 Hướng ra báo cáo (Mảnh ghép cuối cùng)
-Sau khi `main.py` báo `TOÀN BỘ QUY TRÌNH ĐÃ HOÀN TẤT`, dữ liệu của bạn đã nằm gọn gàng tươm tất trong Database.
-Lúc này cắm **Power BI** trực tiếp vào Data source là `PostgreSQL (localhost:5432)`, lấy thẳng view `fct_asset_audit` để vẽ Dashboard!
+## 📊 Dashboard Reporting
+
+After `main.py` reports `ENTIRE PIPELINE COMPLETED SUCCESSFULLY!`, the data is perfectly organized in the Database.
+You can directly plug **Power BI** into the data source `PostgreSQL (localhost:5432)`, and pull the `fct_assets_audit` view to build the Dashboard!
+
+---
+
+## 📝 Notes for Developers
+
+- See the [`AGENTS.md`](AGENTS.md) file to fully grasp coding conventions, pipeline flow, and business logic.
+- All credentials are managed via `.env` — **NEVER** hardcode them in the source code.
+- Data traps in `extract_enroll_to_csv.py` are created **intentionally** for analysis purposes — they are not bugs.

@@ -6,20 +6,20 @@ import psycopg2
 from psycopg2 import OperationalError
 from dotenv import load_dotenv
 
-# Thiết lập encoding utf-8 cho terminal để in tiếng Việt không bị lỗi
+# Set utf-8 encoding for terminal
 sys.stdout.reconfigure(encoding='utf-8')
 
-# Tải cấu hình từ .env
+# Load config from .env
 load_dotenv()
 
 def wait_for_db_ready():
-    print("\n[SYSTEM] Đang kích hoạt hạ tầng Docker và chờ Database...")
+    print("\n[SYSTEM] Activating Docker infrastructure and waiting for Database...")
     
-    # Kích hoạt docker-compose (tự động tải image nếu chưa có, bỏ qua nếu đã chạy)
+    # Activate docker-compose (auto pull image if needed, skip if running)
     subprocess.run(["docker-compose", "up", "-d"], check=True)
     
     max_retries = 10
-    print("           Bắt đầu gõ cửa thăm dò Database...")
+    print("           Start pinging Database...")
     for i in range(max_retries):
         try:
             conn = psycopg2.connect(
@@ -30,37 +30,37 @@ def wait_for_db_ready():
                 port=os.getenv("DB_PORT")
             )
             conn.close()
-            print("  --> Gõ cửa thành công! Database ĐÃ SẴN SÀNG!")
+            print("  --> Ping successful! Database is READY!")
             return
         except OperationalError:
-            print(f"  --> Chờ Database thức dậy (Lần thử {i+1}/{max_retries})...")
+            print(f"  --> Waiting for Database to wake up (Attempt {i+1}/{max_retries})...")
             time.sleep(2)
             
-    print("  --> LỖI MẠNG: Database từ chối kết nối. Vui lòng check lại Docker Desktop!")
+    print("  --> NETWORK ERROR: Database refused connection. Please check Docker Desktop!")
     sys.exit(1)
 
 def run_python_script(path):
-    print(f"\n[PYTHON] Đang chạy: {path}...")
+    print(f"\n[PYTHON] Running: {path}...")
     
-    # Sử dụng sys.executable để lấy đúng đường dẫn của venv hiện tại
+    # Use sys.executable to get correct venv path
     python_executable = sys.executable 
     
-    # Ép các tiến trình con dùng UTF-8 trên console Windows
+    # Force child processes to use UTF-8 on Windows console
     run_env = os.environ.copy()
     run_env["PYTHONUTF8"] = "1"
     
     result = subprocess.run([python_executable, path], capture_output=True, text=True, encoding='utf-8', env=run_env)
     
     if result.returncode == 0:
-        print(f"  --> Thành công!")
+        print(f"  --> Success!")
     else:
-        print(f"  --> LỖI: {result.stderr}")
+        print(f"  --> ERROR: {result.stderr}")
         exit(1)
 
 def run_sql_file(file_path):
-    print(f"\n[SQL] Đang thực thi: {file_path}...")
+    print(f"\n[SQL] Executing: {file_path}...")
     try:
-        # Kết nối DB từ biến môi trường
+        # Connect to DB from environment variables
         conn = psycopg2.connect(
             dbname=os.getenv("DB_NAME"),
             user=os.getenv("DB_USER"),
@@ -70,46 +70,46 @@ def run_sql_file(file_path):
         )
         cur = conn.cursor()
         
-        # Đọc nội dung file SQL
+        # Read SQL file content
         with open(file_path, 'r', encoding='utf-8') as f:
             sql_query = f.read()
         
-        # Thực thi SQL
+        # Execute SQL
         cur.execute(sql_query)
         conn.commit()
         
-        print(f"  --> Thành công: Đã cập nhật View/Table từ {file_path}")
+        print(f"  --> Success: Updated View/Table from {file_path}")
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"  --> LỖI SQL: {e}")
+        print(f"  --> SQL ERROR: {e}")
         exit(1)
 
 def main():
     print("="*50)
-    print("KHỞI CHẠY HỆ THỐNG DATA PIPELINE")
+    print("DATA PIPELINE INITIALIZATION")
     print("="*50)
     
-    # BƯỚC 0: INFRASTRUCTURE SETUP
+    # STEP 0: INFRASTRUCTURE SETUP
     wait_for_db_ready()
     
-    # BƯỚC 1: EXTRACT (Python)
-    # Tải dữ liệu từ Kaggle và tạo dữ liệu giả lập
+    # STEP 1: EXTRACT (Python)
+    # Download data from Kaggle and generate mock data
     run_python_script("scripts/extract_assets_to_csv.py")
     run_python_script("scripts/extract_employees_to_csv.py")
     run_python_script("scripts/extract_enroll_to_csv.py")
     
-    # BƯỚC 2: LOAD (Python)
-    # Nạp dữ liệu thô từ CSV vào Postgres (Staging Layer)
+    # STEP 2: LOAD (Python)
+    # Load raw data from CSV to Postgres (Staging Layer)
     run_python_script("scripts/load_csv_to_db.py")
     
-    # BƯỚC 3: SEED - Ghi đè các business rules vào dữ liệu thô
-    # Phải chạy TRƯỚC khi tạo View để View phản chiếu đúng giá trị
+    # STEP 3: SEED - Overwrite business rules onto raw data
+    # Must run BEFORE creating Views so Views reflect correct values
     run_sql_file("sql/seed_depreciation.sql")
 
-    # BƯỚC 4: TRANSFORM & AUDIT (SQL)
-    # Chạy theo thứ tự: trf_ (làm sạch) -> fct_ (tổng hợp kiểm toán)
-    # Lưu ý: fct_asset_audit phụ thuộc vào trf_assets và trf_employees
+    # STEP 4: TRANSFORM & AUDIT (SQL)
+    # Run in order: trf_ (clean) -> fct_ (audit summary)
+    # Note: fct_asset_audit depends on trf_assets and trf_employees
     sql_files = [
         "sql/trf_assets.sql",
         "sql/trf_employees.sql",
@@ -118,12 +118,12 @@ def main():
     for sql in sql_files:
         run_sql_file(sql)
         
-    # BƯỚC 4: REPORT (Python)
-    # Xuất báo cáo tóm tắt cuối cùng
+    # STEP 5: REPORT (Python)
+    # Export final summary report
     run_python_script("scripts/db_data_summary.py")
     
     print("\n" + "="*50)
-    print("TOÀN BỘ QUY TRÌNH ĐÃ HOÀN TẤT THÀNH CÔNG!")
+    print("ENTIRE PIPELINE COMPLETED SUCCESSFULLY!")
     print("="*50)
 
 if __name__ == "__main__":

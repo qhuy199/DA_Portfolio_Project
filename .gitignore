@@ -1,22 +1,35 @@
-# Python environment
+# ===== Python =====
 venv/
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Database Session & Logs (Dọn dẹp file rác)
+# ===== IDE & Editor =====
+.vscode/
+*.code-workspace
+
+# ===== Database Session & Logs =====
 *.session.sql
 *.log
 
-# Sensitive Data (Bảo mật thông tin Database)
+# ===== Sensitive Data =====
 .env
 
-# Data files (Chỉ giữ cấu trúc, không upload data thật nếu quá nặng hoặc nhạy cảm)
-# Upload cả data sample để làm Portfolio
+# ===== Data files =====
+# Auto-generated CSVs from pipeline, no need to track
 data/raw/*.csv
 data/processed/*.csv
 
-# OS specific files
+# ===== Reports (Power BI) =====
+# .pbix files are too heavy for Git, use OneDrive/SharePoint
+reports/*.pbix
+
+# ===== OS specific =====
 .DS_Store
 Thumbs.db
-.vscode/
+
+# ===== Temporary / Utility files =====
+# One-time use files, not part of main pipeline
+PROJECT_EXPORT.txt
+export_project.py
+t.ipynb
