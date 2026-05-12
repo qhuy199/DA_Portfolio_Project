@@ -33,3 +33,8 @@ Thumbs.db
 PROJECT_EXPORT.txt
 export_project.py
 t.ipynb
+# ==== AI internal files ====
+.agents/
+.claude/skills/
+CLAUDE.md
+AGENTS.md

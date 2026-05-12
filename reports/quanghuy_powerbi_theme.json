@@ -1,0 +1,127 @@
+{
+  "name": "QuangHuy IT Dashboard",
+  "dataColors": [
+    "#1ABC9C",
+    "#2ECC71",
+    "#9B59B6",
+    "#F39C12",
+    "#3498DB",
+    "#E74C3C",
+    "#27AE60",
+    "#8E44AD"
+  ],
+  "background": "#F0F4F0",
+  "foreground": "#2C3E50",
+  "tableAccent": "#1ABC9C",
+  "visualStyles": {
+    "*": {
+      "*": {
+        "fontFamily": [{ "value": "Segoe UI" }],
+        "fontSize": [{ "value": 11 }],
+        "color": [{ "solid": { "color": "#2C3E50" } }]
+      }
+    },
+    "title": {
+      "*": {
+        "fontFamily": [{ "value": "Segoe UI" }],
+        "fontSize": [{ "value": 24 }],
+        "fontBold": [{ "value": true }],
+        "color": [{ "solid": { "color": "#2C3E50" } }],
+        "background": [{ "solid": { "color": "#F0F4F0" } }]
+      }
+    },
+    "card": {
+      "*": {
+        "fontFamily": [{ "value": "Segoe UI" }],
+        "fontSize": [{ "value": 32 }],
+        "fontBold": [{ "value": true }],
+        "labelFontFamily": [{ "value": "Segoe UI" }],
+        "labelFontSize": [{ "value": 10 }],
+        "background": [{ "solid": { "color": "#FFFFFF" } }],
+        "border": [{ "show": true, "radius": 12 }]
+      }
+    },
+    "barChart": {
+      "*": {
+        "fontFamily": [{ "value": "Segoe UI" }],
+        "fontSize": [{ "value": 10 }],
+        "dataColor": [{ "solid": { "color": "#1ABC9C" } }],
+        "background": [{ "solid": { "color": "#FFFFFF" } }]
+      }
+    },
+    "donutChart": {
+      "*": {
+        "fontFamily": [{ "value": "Segoe UI" }],
+        "fontSize": [{ "value": 10 }],
+        "background": [{ "solid": { "color": "#FFFFFF" } }]
+      }
+    },
+    "tableEx": {
+      "*": {
+        "fontFamily": [{ "value": "Segoe UI" }],
+        "fontSize": [{ "value": 11 }],
+        "fontColor": [{ "solid": { "color": "#2C3E50" } }],
+        "headerFontSize": [{ "value": 11 }],
+        "headerFontColor": [{ "solid": { "color": "#FFFFFF" } }],
+        "headerBackground": [{ "solid": { "color": "#27AE60" } }],
+        "background": [{ "solid": { "color": "#FFFFFF" } }]
+      }
+    },
+    "matrix": {
+      "*": {
+        "fontFamily": [{ "value": "Segoe UI" }],
+        "fontSize": [{ "value": 11 }],
+        "fontColor": [{ "solid": { "color": "#2C3E50" } }],
+        "headerFontSize": [{ "value": 11 }],
+        "headerFontColor": [{ "solid": { "color": "#FFFFFF" } }],
+        "headerBackground": [{ "solid": { "color": "#27AE60" } }],
+        "background": [{ "solid": { "color": "#FFFFFF" } }]
+      }
+    },
+    "gauge": {
+      "*": {
+        "fontFamily": [{ "value": "Segoe UI" }],
+        "fontSize": [{ "value": 32 }],
+        "fontBold": [{ "value": true }],
+        "background": [{ "solid": { "color": "#FFFFFF" } }]
+      }
+    },
+    "slicer": {
+      "*": {
+        "fontFamily": [{ "value": "Segoe UI" }],
+        "fontSize": [{ "value": 11 }],
+        "fontColor": [{ "solid": { "color": "#2C3E50" } }],
+        "background": [{ "solid": { "color": "#FFFFFF" } }]
+      }
+    },
+    "textbox": {
+      "*": {
+        "fontFamily": [{ "value": "Segoe UI" }],
+        "fontSize": [{ "value": 11 }],
+        "fontColor": [{ "solid": { "color": "#7F8C8D" } }]
+      }
+    }
+  },
+  "textClasses": {
+    "callout": {
+      "fontSize": 32,
+      "fontFace": "Segoe UI",
+      "color": "#2C3E50"
+    },
+    "title": {
+      "fontSize": 24,
+      "fontFace": "Segoe UI",
+      "color": "#2C3E50"
+    },
+    "header": {
+      "fontSize": 11,
+      "fontFace": "Segoe UI",
+      "color": "#7F8C8D"
+    },
+    "label": {
+      "fontSize": 10,
+      "fontFace": "Segoe UI",
+      "color": "#7F8C8D"
+    }
+  }
+}
