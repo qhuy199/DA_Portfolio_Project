@@ -104,8 +104,10 @@ DA_PORTFOLIO_PROJECT/
 │   ├── extract_employees_to_csv.py   # Generate HR data
 │   ├── extract_enroll_to_csv.py      # Generate enrollment data (with data traps)
 │   ├── load_csv_to_db.py             # Load CSV to Staging Tables
-│   └── eda_data_quality.py           # EDA script to explore data traps
 │   └── db_data_summary.py            # Console summary report
+├── notebooks/                # Exploratory Data Analysis (EDA)
+│   ├── eda_data_quality.ipynb        # Interactive report (Charts & Insights)
+│   └── eda_data_quality.py           # Script version (Automation & Git-friendly)
 ├── sql/                      # Data transformation logic (runs in DB)
 │   ├── seed_depreciation.sql         # Seed: Device depreciation table
 │   ├── trf_assets.sql                # Transform: Clean assets data
